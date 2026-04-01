@@ -6,6 +6,7 @@ import com.multigenysys.ecommerce.dto.order.OrderResponse;
 import com.multigenysys.ecommerce.entity.CartItem;
 import com.multigenysys.ecommerce.entity.Order;
 import com.multigenysys.ecommerce.entity.OrderItem;
+import com.multigenysys.ecommerce.entity.OrderStatus;
 import com.multigenysys.ecommerce.entity.PaymentStatus;
 import com.multigenysys.ecommerce.entity.Product;
 import com.multigenysys.ecommerce.entity.User;
@@ -113,6 +114,11 @@ public class OrderService {
     public void updatePaymentStatus(Order order, PaymentStatus status, String paymentReference) {
         order.setPaymentStatus(status);
         order.setPaymentReference(paymentReference);
+        if (status == PaymentStatus.SUCCESS) {
+            order.setOrderStatus(OrderStatus.CONFIRMED);
+        } else if (status == PaymentStatus.FAILED && order.getOrderStatus() == OrderStatus.CREATED) {
+            order.setOrderStatus(OrderStatus.CANCELLED);
+        }
         orderRepository.save(order);
     }
 

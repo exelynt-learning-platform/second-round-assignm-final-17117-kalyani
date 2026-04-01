@@ -5,6 +5,8 @@ import com.multigenysys.ecommerce.dto.order.OrderResponse;
 import com.multigenysys.ecommerce.dto.order.ShippingDetailsRequest;
 import com.multigenysys.ecommerce.entity.CartItem;
 import com.multigenysys.ecommerce.entity.Order;
+import com.multigenysys.ecommerce.entity.OrderStatus;
+import com.multigenysys.ecommerce.entity.PaymentStatus;
 import com.multigenysys.ecommerce.entity.Product;
 import com.multigenysys.ecommerce.entity.User;
 import com.multigenysys.ecommerce.repository.OrderRepository;
@@ -12,7 +14,6 @@ import com.multigenysys.ecommerce.repository.ProductRepository;
 import com.multigenysys.ecommerce.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -76,5 +77,18 @@ class OrderServiceTest {
         assertEquals(new BigDecimal("1000"), response.totalPrice());
         assertEquals(3, product.getStockQuantity());
         verify(cartService).clearCart(1L);
+    }
+
+    @Test
+    void updatePaymentStatus_ShouldConfirmOrderWhenPaymentSucceeds() {
+        Order order = new Order();
+        order.setOrderStatus(OrderStatus.CREATED);
+
+        orderService.updatePaymentStatus(order, PaymentStatus.SUCCESS, "pi_123");
+
+        assertEquals(PaymentStatus.SUCCESS, order.getPaymentStatus());
+        assertEquals(OrderStatus.CONFIRMED, order.getOrderStatus());
+        assertEquals("pi_123", order.getPaymentReference());
+        verify(orderRepository).save(order);
     }
 }

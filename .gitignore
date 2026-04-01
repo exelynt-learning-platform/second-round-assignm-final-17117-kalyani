@@ -3,3 +3,7 @@
 *.iml
 *.log
 /.vscode/
+/.m2repo/
+/.settings/
+.classpath
+.project
