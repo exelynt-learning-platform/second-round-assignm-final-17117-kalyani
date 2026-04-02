@@ -33,6 +33,10 @@ public class PaymentService {
         Stripe.apiKey = stripeSecretKey;
     }
 
+    private boolean isMockMode() {
+        return stripeSecretKey == null || stripeSecretKey.isBlank() || stripeSecretKey.contains("replace_me");
+    }
+
     @Transactional
     public PaymentIntentResponse createPaymentIntent(String email, Long orderId) {
         Order order = orderService.getOrderEntityForUser(email, orderId);
@@ -40,7 +44,7 @@ public class PaymentService {
             throw new BadRequestException("Order payment is already completed");
         }
 
-        if (stripeSecretKey == null || stripeSecretKey.isBlank() || stripeSecretKey.contains("replace_me")) {
+        if (isMockMode()) {
             String intentId = "pi_mock_" + UUID.randomUUID();
             String secret = "pi_mock_secret_" + UUID.randomUUID();
             orderService.updatePaymentStatus(order, PaymentStatus.PENDING, intentId);
@@ -65,10 +69,31 @@ public class PaymentService {
     @Transactional
     public void updatePaymentResult(String email, Long orderId, PaymentUpdateRequest request) {
         Order order = orderService.getOrderEntityForUser(email, orderId);
-        if (request.success()) {
-            orderService.updatePaymentStatus(order, PaymentStatus.SUCCESS, request.paymentIntentId());
-        } else {
-            orderService.updatePaymentStatus(order, PaymentStatus.FAILED, request.paymentIntentId());
+        if (order.getPaymentReference() == null || !order.getPaymentReference().equals(request.paymentIntentId())) {
+            throw new BadRequestException("Payment intent does not match the order");
+        }
+
+        if (isMockMode()) {
+            if (request.success()) {
+                orderService.updatePaymentStatus(order, PaymentStatus.SUCCESS, request.paymentIntentId());
+            } else {
+                orderService.updatePaymentStatus(order, PaymentStatus.FAILED, request.paymentIntentId());
+            }
+            return;
+        }
+
+        try {
+            PaymentIntent paymentIntent = PaymentIntent.retrieve(request.paymentIntentId());
+            if ("succeeded".equalsIgnoreCase(paymentIntent.getStatus())) {
+                orderService.updatePaymentStatus(order, PaymentStatus.SUCCESS, request.paymentIntentId());
+            } else if ("canceled".equalsIgnoreCase(paymentIntent.getStatus())
+                    || "requires_payment_method".equalsIgnoreCase(paymentIntent.getStatus())) {
+                orderService.updatePaymentStatus(order, PaymentStatus.FAILED, request.paymentIntentId());
+            } else {
+                throw new BadRequestException("Payment is not completed yet");
+            }
+        } catch (StripeException e) {
+            throw new BadRequestException("Payment verification failed: " + e.getMessage());
         }
     }
 }

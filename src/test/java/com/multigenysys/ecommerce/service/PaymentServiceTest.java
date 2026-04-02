@@ -4,6 +4,7 @@ import com.multigenysys.ecommerce.dto.payment.PaymentIntentResponse;
 import com.multigenysys.ecommerce.dto.payment.PaymentUpdateRequest;
 import com.multigenysys.ecommerce.entity.Order;
 import com.multigenysys.ecommerce.entity.PaymentStatus;
+import com.multigenysys.ecommerce.exception.BadRequestException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -14,6 +15,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,10 +48,23 @@ class PaymentServiceTest {
     void updatePaymentResult_ShouldMarkSuccess() {
         Order order = new Order();
         order.setId(1L);
+        order.setPaymentReference("pi_123");
         when(orderService.getOrderEntityForUser("user@mail.com", 1L)).thenReturn(order);
 
+        ReflectionTestUtils.setField(paymentService, "stripeSecretKey", "");
         paymentService.updatePaymentResult("user@mail.com", 1L, new PaymentUpdateRequest("pi_123", true));
 
         verify(orderService).updatePaymentStatus(order, PaymentStatus.SUCCESS, "pi_123");
+    }
+
+    @Test
+    void updatePaymentResult_ShouldRejectMismatchedPaymentIntent() {
+        Order order = new Order();
+        order.setId(1L);
+        order.setPaymentReference("pi_expected");
+        when(orderService.getOrderEntityForUser("user@mail.com", 1L)).thenReturn(order);
+
+        assertThrows(BadRequestException.class,
+                () -> paymentService.updatePaymentResult("user@mail.com", 1L, new PaymentUpdateRequest("pi_other", true)));
     }
 }

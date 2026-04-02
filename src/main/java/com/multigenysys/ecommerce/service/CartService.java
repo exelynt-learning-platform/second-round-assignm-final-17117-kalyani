@@ -59,10 +59,17 @@ public class CartService {
         if (!item.getUser().getId().equals(user.getId())) {
             throw new BadRequestException("You can only update your own cart");
         }
-        if (request.quantity() > item.getProduct().getStockQuantity()) {
+        Integer requestedQuantity = request.quantity();
+        if (requestedQuantity == null || requestedQuantity < 1) {
+            throw new BadRequestException("Quantity must be at least 1");
+        }
+        if (item.getProduct() == null || item.getProduct().getStockQuantity() == null) {
+            throw new BadRequestException("Product stock information is unavailable");
+        }
+        if (requestedQuantity > item.getProduct().getStockQuantity()) {
             throw new BadRequestException("Requested quantity exceeds stock quantity");
         }
-        item.setQuantity(request.quantity());
+        item.setQuantity(requestedQuantity);
         cartItemRepository.save(item);
         return getMyCart(email);
     }
